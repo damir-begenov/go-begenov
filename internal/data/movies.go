@@ -20,10 +20,30 @@ type Movie struct {
 	Version   int32     `json:"version"`                  // The version number starts at 1 and will be incremented each
 	// time the movie information is updated
 }
+type Actor struct {
+	ID        int64     `json:"id"`                       // Unique integer ID for the movie
+	CreatedAt time.Time `json:"-"`                        // Timestamp for when the movie is added to our database, "-" directive, hidden in response
+	Name      string    `json:"title"`                    // Movie title
+	Year      int32     `json:"year,omitempty"`           // Movie release year, "omitempty" - hide from response if empty
+	Runtime   int32     `json:"runtime,omitempty,string"` // Movie runtime (in minutes), "string" - convert int to string
+	Genres    []string  `json:"genres,omitempty"`         // Slice of genres for the movie (romance, comedy, etc.)
+}
 
 // Define a MovieModel struct type which wraps a sql.DB connection pool.
 type MovieModel struct {
 	DB *sql.DB
+}
+type ActorModel struct {
+	DB *sql.DB
+}
+
+func (m MovieModel) InsertActor(actor *Actor) error {
+	query := `
+		INSERT INTO actor(name, year, runtime, genres)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at, version`
+
+	return m.DB.QueryRow(query, &actor.Name, &actor.Year, &actor.Runtime, pq.Array(&actor.Genres)).Scan(&actor.ID, &actor.CreatedAt)
 }
 
 // method for inserting a new record in the movies table.

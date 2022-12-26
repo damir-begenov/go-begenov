@@ -7,38 +7,57 @@ import (
 	"net/http"
 )
 
-// Add a createMovieHandler for the "POST /v1/movies" endpoint.
-// return a JSON response.
+func (app *application) createActorHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Name    string   `json:"name"`
+		Year    int32    `json:"year"`
+		Runtime int32    `json:"runtime"`
+		Genres  []string `json:"genres"`
+	}
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+	}
+	actor := &data.Actor{
+		Name:    input.Name,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres}
+	err = app.models.Movies.InsertActor(actor)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/actor/%d", actor.ID))
+
+	err = app.writeJSON(w, http.StatusCreated, envelope{"actor": actor}, headers)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
-	//Declare an anonymous struct to hold the information that we expect to be in the
-	// HTTP request body (note that the field names and types in the struct are a subset
-	// of the Movie struct that we created earlier). This struct will be our *target
-	// decode destination*.
 	var input struct {
 		Title   string   `json:"title"`
 		Year    int32    `json:"year"`
 		Runtime int32    `json:"runtime"`
 		Genres  []string `json:"genres"`
 	}
-	// if there is error with decoding, we are sending corresponding message
 	err := app.readJSON(w, r, &input) //non-nil pointer as the target decode destination
 	if err != nil {
 		app.errorResponse(w, r, http.StatusBadRequest, err.Error())
 	}
-
 	movie := &data.Movie{
 		Title:   input.Title,
 		Year:    input.Year,
 		Runtime: input.Runtime,
 		Genres:  input.Genres,
 	}
-
 	err = app.models.Movies.Insert(movie)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
-
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/movies/%d", movie.ID))
 
@@ -46,8 +65,6 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
-	// // Dump the contents of the input struct in a HTTP response.
-	// fmt.Fprintf(w, "%+v\n", input) //+v here is adding the field name of a value // https://pkg.go.dev/fmt
 }
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
