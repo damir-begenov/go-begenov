@@ -11,17 +11,18 @@ func (app *application) routes() *httprouter.Router {
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
-	// Register the relevant methods, URL patterns and handler functions for our
-	// endpoints using the HandlerFunc() method. Note that http.MethodGet and
-	// http.MethodPost are constants which equate to the strings "GET" and "POST"
-	// respectively.
+
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/movies", app.createMovieHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/actor", app.createActorHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.showMovieHandler)
-	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.updateMovieHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/actor/:id", app.showActorHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/movies/:id", app.updateMovieHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/actor/:id", app.updateActorHandler)
+	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.updateMovieeHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
-
+	router.HandlerFunc(http.MethodDelete, "/v1/actor/:id", app.deleteActorHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/movies", app.listMoviesHandler)
 	// Return the httprouter instance.
 	return router
 }
