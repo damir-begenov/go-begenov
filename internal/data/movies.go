@@ -32,12 +32,30 @@ type Actor struct {
 
 }
 
+type Directors struct {
+	ID      int64    `json:"id"`      // Unique integer ID for the movie
+	Name    string   `json:"name"`    // Movie title
+	Surname string   `json:"surname"` // Movie title
+	Awords  []string `json:"awords,omitempty"`
+}
+
 // Define a MovieModel struct type which wraps a sql.DB connection pool.
 type MovieModel struct {
 	DB *sql.DB
 }
 type ActorModel struct {
 	DB *sql.DB
+}
+type DirectorModel struct {
+	DB *sql.DB
+}
+
+func (m DirectorModel) InsertDirector(directors *Directors) error {
+	query := `
+		INSERT INTO directors(name, surname,awords)
+		VALUES ($1, $2, $3)
+		RETURNING id`
+	return m.DB.QueryRow(query, &directors.Name, &directors.Surname, pq.Array(&directors.Awords)).Scan(&directors.ID)
 }
 
 func (m ActorModel) INSERTACTOR(actor *Actor) error {
@@ -290,4 +308,38 @@ LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 		return nil, err
 	}
 	return movies, nil
+}
+
+func (m DirectorModel) GetAllDirectors(name string, surname string, awords []string, filters Filters) ([]*Directors, error) { // Update the SQL query to include the filter conditions.
+	query := fmt.Sprintf(`
+SELECT id, name, surname, awords
+FROM directors
+WHERE (to_tsvector('simple', name) @@ plainto_tsquery('simple', $1) OR $1 = '') AND (awords @> $2 OR $2 = '{}')
+ORDER BY %s %s, id ASC
+LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	// As our SQL query now has quite a few placeholder parameters, let's collect the // values for the placeholders in a slice. Notice here how we call the limit() and // offset() methods on the Filters struct to get the appropriate values for the
+	// LIMIT and OFFSET clauses.
+	args := []any{name, pq.Array(awords), filters.limit(), filters.offset()}
+	rows, err := m.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	director := []*Directors{}
+	for rows.Next() {
+		var directors Directors
+		err := rows.Scan(&directors.ID,
+			&directors.Name, &directors.Surname, pq.Array(&directors.Awords),
+		)
+		if err != nil {
+			return nil, err
+		}
+		director = append(director, &directors)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return director, nil
 }

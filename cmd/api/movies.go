@@ -38,6 +38,34 @@ func (app *application) createActorHandler(w http.ResponseWriter, r *http.Reques
 		app.serverErrorResponse(w, r, err)
 	}
 }
+func (app *application) createDirectorHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Name    string   `json:"name"`
+		Surname string   `json:"surname"`
+		Awords  []string `json:"awords"`
+	}
+	err := app.readJSON(w, r, &input) //non-nil pointer as the target decode destination
+	if err != nil {
+		app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+	}
+	directors := &data.Directors{
+		Name:    input.Name,
+		Surname: input.Surname,
+		Awords:  input.Awords,
+	}
+	err = app.models.Directors.InsertDirector(directors)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/directors/%d", directors.ID))
+
+	err = app.writeJSON(w, http.StatusCreated, envelope{"director": directors}, headers)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
 func (app *application) showActorHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
@@ -352,6 +380,36 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	}
 	// Send a JSON response containing the movie data.
 	err = app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) listDirectorsHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Name    string
+		Surname string
+		Awords  []string
+		data.Filters
+	}
+	v := validator.New()
+	qs := r.URL.Query()
+	input.Name = app.readString(qs, "name", "")
+	input.Surname = app.readString(qs, "surname", "")
+	input.Awords = app.readCSV(qs, "awords", []string{})
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+	input.Filters.SortSafelist = []string{"id", "name", "surname", "-id", "-name", "-awords", "awords", "-surname", "-runtime"}
+
+	// Call the GetAll() method to retrieve the movies, passing in the various filter // parameters.
+	directors, err := app.models.Directors.GetAllDirectors(input.Name, input.Surname, input.Awords, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	// Send a JSON response containing the movie data.
+	err = app.writeJSON(w, http.StatusOK, envelope{"director": directors}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
